@@ -1,0 +1,24 @@
+{# One table row. Targeted by hx-delete so a removal swaps out just this <tr>. #}
+<tr id="customer-{{ customer.id }}">
+  <td><a href="/customers/{{ customer.id }}">{{ customer.full_name }}</a></td>
+  <td><a class="muted" href="mailto:{{ customer.email }}">{{ customer.email }}</a></td>
+  <td>{{ customer.company or "—" }}</td>
+  <td>{{ customer.phone or "—" }}</td>
+  <td>
+    {% if customer.is_active %}
+      <span class="pill pill-ok">Active</span>
+    {% else %}
+      <span class="pill">Inactive</span>
+    {% endif %}
+  </td>
+  <td class="actions">
+    <a href="/customers/{{ customer.id }}/edit">Edit</a>
+    <button class="link danger"
+            hx-delete="/customers/{{ customer.id }}"
+            hx-target="#customer-{{ customer.id }}"
+            hx-swap="outerHTML swap:200ms"
+            hx-confirm="Delete {{ customer.full_name }}? This cannot be undone.">
+      Delete
+    </button>
+  </td>
+</tr>

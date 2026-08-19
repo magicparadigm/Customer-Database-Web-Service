@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% set editing = customer is not none %}
+{% block title %}{{ "Edit" if editing else "New" }} customer — Customer Database{% endblock %}
+
+{#- values is a Customer on edit and a plain dict on re-render after an error;
+    Jinja's dotted access covers both. -#}
+{% macro field(name, label, type="text", required=false) %}
+<div class="field {{ 'has-error' if errors.get(name) }}">
+  <label for="{{ name }}">{{ label }}{% if required %} <span class="req">*</span>{% endif %}</label>
+  <input id="{{ name }}" name="{{ name }}" type="{{ type }}"
+         value="{{ values[name] if values[name] is defined and values[name] is not none else '' }}"
+         {% if required %}required{% endif %}>
+  {% if errors.get(name) %}<p class="error">{{ errors[name] }}</p>{% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<p class="crumb">
+  <a href="{{ '/customers/' ~ customer.id if editing else '/customers' }}">← Cancel</a>
+</p>
+
+<h1>{{ "Edit customer" if editing else "New customer" }}</h1>
+
+<form class="card form" method="post"
+      action="{{ '/customers/' ~ customer.id if editing else '/customers' }}">
+
+  <fieldset>
+    <legend>Identity</legend>
+    <div class="row">
+      {{ field("first_name", "First name", required=true) }}
+      {{ field("last_name", "Last name", required=true) }}
+    </div>
+    <div class="row">
+      {{ field("email", "Email", type="email", required=true) }}
+      {{ field("phone", "Phone", type="tel") }}
+    </div>
+    {{ field("company", "Company") }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Address</legend>
+    {{ field("street", "Street") }}
+    <div class="row">
+      {{ field("city", "City") }}
+      {{ field("state", "State / Region") }}
+    </div>
+    <div class="row">
+      {{ field("postal_code", "Postal code") }}
+      {{ field("country", "Country") }}
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Other</legend>
+    <div class="field">
+      <label for="notes">Notes</label>
+      <textarea id="notes" name="notes" rows="4">{{ values["notes"] if values["notes"] is defined and values["notes"] is not none else "" }}</textarea>
+    </div>
+    <label class="check">
+      <input type="checkbox" name="is_active" value="1"
+             {% if values["is_active"] is not defined or values["is_active"] %}checked{% endif %}>
+      Active
+    </label>
+  </fieldset>
+
+  <div class="form-actions">
+    <button type="submit" class="primary">{{ "Save changes" if editing else "Create customer" }}</button>
+    <a class="button" href="{{ '/customers/' ~ customer.id if editing else '/customers' }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

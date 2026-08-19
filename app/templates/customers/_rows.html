@@ -1,0 +1,46 @@
+{# Rendered standalone as an HTMX fragment, and nested inside list.html. #}
+{% if customers %}
+<p class="muted count">{{ total }} customer{{ '' if total == 1 else 's' }}</p>
+
+<table class="grid">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Company</th>
+      <th>Phone</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for customer in customers %}
+      {% include "customers/_row.html" %}
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if total_pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}
+  <a hx-get="/customers/search?search={{ search|urlencode }}&page={{ page - 1 }}"
+     hx-target="#results" hx-swap="innerHTML" href="#">← Previous</a>
+  {% endif %}
+  <span class="muted">Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}
+  <a hx-get="/customers/search?search={{ search|urlencode }}&page={{ page + 1 }}"
+     hx-target="#results" hx-swap="innerHTML" href="#">Next →</a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="empty">
+  {% if search %}
+    <p>No customers match “{{ search }}”.</p>
+  {% else %}
+    <p>No customers yet.</p>
+    <a class="primary button" href="/customers/new">Add the first one</a>
+  {% endif %}
+</div>
+{% endif %}

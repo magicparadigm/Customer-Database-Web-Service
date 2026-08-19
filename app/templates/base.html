@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Customer Database{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  {% if user %}
+  <header class="topbar">
+    <a class="brand" href="/customers">Customer Database</a>
+    <nav>
+      <a href="/customers">All customers</a>
+      <a href="/customers/new">New customer</a>
+      <a href="/docs">API</a>
+    </nav>
+    <form class="logout" method="post" action="/logout">
+      <span class="who">{{ user.username }}</span>
+      <button type="submit" class="link">Sign out</button>
+    </form>
+  </header>
+  {% endif %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

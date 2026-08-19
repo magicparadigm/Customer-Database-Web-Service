@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Customers — Customer Database{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1>Customers</h1>
+  <a class="primary button" href="/customers/new">New customer</a>
+</div>
+
+<input class="search"
+       type="search"
+       name="search"
+       value="{{ search }}"
+       placeholder="Search name, email, or company…"
+       autocomplete="off"
+       hx-get="/customers/search"
+       hx-trigger="input changed delay:250ms, search"
+       hx-target="#results"
+       hx-swap="innerHTML"
+       hx-indicator="#spinner">
+
+<span id="spinner" class="htmx-indicator muted">Searching…</span>
+
+<div id="results">
+  {% include "customers/_rows.html" %}
+</div>
+{% endblock %}

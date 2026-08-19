@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.full_name }} — Customer Database{% endblock %}
+
+{% block content %}
+<p class="crumb"><a href="/customers">← All customers</a></p>
+
+<div class="page-head">
+  <h1>
+    {{ customer.full_name }}
+    {% if not customer.is_active %}<span class="pill">Inactive</span>{% endif %}
+  </h1>
+  <a class="button" href="/customers/{{ customer.id }}/edit">Edit</a>
+</div>
+
+<div class="card">
+  <dl class="detail">
+    <dt>Email</dt>
+    <dd><a href="mailto:{{ customer.email }}">{{ customer.email }}</a></dd>
+
+    <dt>Phone</dt>
+    <dd>{{ customer.phone or "—" }}</dd>
+
+    <dt>Company</dt>
+    <dd>{{ customer.company or "—" }}</dd>
+
+    <dt>Address</dt>
+    <dd>
+      {% if customer.street or customer.city or customer.country %}
+        {{ customer.street }}{% if customer.street %}<br>{% endif %}
+        {{ customer.city }}{% if customer.city and customer.state %}, {% endif %}{{ customer.state }}
+        {{ customer.postal_code }}{% if customer.city or customer.state %}<br>{% endif %}
+        {{ customer.country }}
+      {% else %}—{% endif %}
+    </dd>
+
+    <dt>Notes</dt>
+    <dd class="notes">{{ customer.notes or "—" }}</dd>
+
+    <dt>Added</dt>
+    <dd class="muted">{{ customer.created_at.strftime("%d %b %Y, %H:%M") }}</dd>
+
+    <dt>Updated</dt>
+    <dd class="muted">{{ customer.updated_at.strftime("%d %b %Y, %H:%M") }}</dd>
+  </dl>
+</div>
+{% endblock %}
