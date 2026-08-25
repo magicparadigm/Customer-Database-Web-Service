@@ -11,6 +11,14 @@
     <p class="alert" role="alert">{{ error }}</p>
     {% endif %}
 
+    {% if google_oauth_enabled %}
+    <a class="button oauth-google"
+       href="/auth/google/login{% if next %}?next={{ next }}{% endif %}">
+      Sign in with Google
+    </a>
+    <p class="divider"><span>or</span></p>
+    {% endif %}
+
     <label for="username">Username</label>
     <input id="username" name="username" value="{{ username|default('') }}"
            autocomplete="username" required autofocus>

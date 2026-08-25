@@ -20,6 +20,11 @@ alembic upgrade head
 python manage.py createuser     # prompts for username, email, password
 ```
 
+Want staff to be able to sign in with Google instead of typing a password? Set
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `.env` — see the comments in
+[`.env.example`](.env.example) for how to get them and which redirect URI to register.
+Leave them unset and the login page only shows the password form.
+
 Generate a real secret key for anything but local development:
 
 ```bash
@@ -47,7 +52,7 @@ Want sample data to look at? `python manage.py seed --count 30`.
 ## Tests
 
 ```bash
-pytest                                  # 49 tests
+pytest                                  # 57 tests
 pytest --cov=app --cov-report=term-missing
 ```
 
@@ -63,8 +68,8 @@ app/
   models.py        Customer, User
   schemas.py       Pydantic request/response models
   crud.py          Shared data-access and business logic
-  auth.py          Password hashing, sessions, get_current_user
-  routers/         api_customers, web_customers, web_auth
+  auth.py          Password hashing, sessions, get_current_user, OAuth identity linking
+  routers/         api_customers, web_customers, web_auth, oauth
   templates/       Jinja2 pages and HTMX fragments (_row, _rows)
   static/          style.css, vendored htmx.min.js
 alembic/           Migrations
@@ -85,6 +90,9 @@ filesystem doesn't persist SQLite files across deploys).
    - `DEBUG=false`
    - `SECRET_KEY=` output of `python -c "import secrets; print(secrets.token_urlsafe(48))"`
      (the app refuses to start in production with the placeholder key)
+   - Optionally `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` to enable Google sign-in — register
+     `https://<your-app>.up.railway.app/auth/google/callback` as an authorized redirect URI for
+     that OAuth client first.
 5. Deploy. The [`Procfile`](Procfile)'s `release:` line runs `alembic upgrade head` before the
    new `web:` process takes traffic — check the build log for it.
 6. Create the first login against the live database, one time, via the Railway CLI:
@@ -106,6 +114,11 @@ changing that value and reviewing the migrations — install the matching driver
 
 **Sessions, not JWT.** The UI is a browser tool, so it uses a signed HTTP-only session cookie —
 simpler and revocable. Passwords are hashed with Argon2.
+
+**OAuth links accounts, it doesn't create them.** Signing in with Google matches the verified
+email from Google against an existing `users` row and links it (`oauth_provider`/`oauth_subject`)
+on first use — it never provisions a new staff account on its own. Access is still controlled by
+who an admin ran `manage.py createuser` for; OAuth just adds a second way to prove you're them.
 
 **Auth failures differ by surface.** Anything under `/api` gets a `401`; everything else
 redirects to `/login?next=…`. That split is by path, deliberately, rather than by sniffing the

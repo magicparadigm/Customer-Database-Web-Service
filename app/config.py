@@ -33,6 +33,15 @@ class Settings(BaseSettings):
 
     page_size: int = 25
 
+    # "Sign in with Google" is offered only when both are set; unset leaves
+    # password login as the only option.
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+
+    @property
+    def google_oauth_enabled(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret)
+
     @model_validator(mode="after")
     def _reject_dev_secret_in_production(self) -> "Settings":
         if self.environment == "production" and self.secret_key == _DEV_SECRET_KEY:
