@@ -8,7 +8,6 @@
   <script src="/static/htmx.min.js" defer></script>
 </head>
 <body>
-  {% if user %}
   <header class="topbar">
     <a class="brand" href="/customers">Customer Database</a>
     <nav>
@@ -16,12 +15,8 @@
       <a href="/customers/new">New customer</a>
       <a href="/docs">API</a>
     </nav>
-    <form class="logout" method="post" action="/logout">
-      <span class="who">{{ user.username }}</span>
-      <button type="submit" class="link">Sign out</button>
-    </form>
+    <span class="who">{{ user.username }}</span>
   </header>
-  {% endif %}
 
   <main>
     {% block content %}{% endblock %}

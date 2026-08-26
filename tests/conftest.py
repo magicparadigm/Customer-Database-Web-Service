@@ -58,11 +58,7 @@ def client(db_session):
 
 @pytest.fixture
 def auth_client(client, user):
-    """Client with a real session cookie, obtained by logging in."""
-    response = client.post(
-        "/login",
-        data={"username": user.username, "password": TEST_PASSWORD},
-        follow_redirects=False,
-    )
-    assert response.status_code == 303, "login fixture failed to authenticate"
+    """Client that sends HTTP Basic credentials on every request, like a browser
+    that has them cached for the realm."""
+    client.auth = (user.username, TEST_PASSWORD)
     return client
