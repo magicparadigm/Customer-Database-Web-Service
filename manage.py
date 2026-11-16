@@ -1,6 +1,7 @@
 """Small admin CLI.
 
     python manage.py createuser [--username U] [--email E] [--password P]
+    python manage.py setpassword [--username U] [--password P]
     python manage.py listusers
     python manage.py seed [--count 25]
 
@@ -46,6 +47,34 @@ def cmd_createuser(args: argparse.Namespace) -> int:
         db.add(user)
         db.commit()
         print(f"Created user {user.username!r} (id={user.id}).")
+    return 0
+
+
+def cmd_setpassword(args: argparse.Namespace) -> int:
+    """Reset the password of an existing staff login."""
+    username = args.username or input("Username: ").strip()
+    password = args.password
+
+    if not password:
+        password = getpass.getpass("New password: ")
+        if password != getpass.getpass("Confirm new password: "):
+            print("Passwords do not match.", file=sys.stderr)
+            return 1
+
+    if len(password) < 8:
+        print("Password must be at least 8 characters.", file=sys.stderr)
+        return 1
+
+    with SessionLocal() as db:
+        user = db.scalar(select(User).where(User.username == username))
+        if user is None:
+            print(f"No user named {username!r}. Run: python manage.py listusers",
+                  file=sys.stderr)
+            return 1
+
+        user.hashed_password = hash_password(password)
+        db.commit()
+        print(f"Password updated for {user.username!r} (id={user.id}).")
     return 0
 
 
@@ -103,6 +132,11 @@ def main() -> int:
     p.add_argument("--email")
     p.add_argument("--password", help="Prompted for if omitted")
     p.set_defaults(func=cmd_createuser)
+
+    p = sub.add_parser("setpassword", help="Reset a staff login's password")
+    p.add_argument("--username")
+    p.add_argument("--password", help="Prompted for if omitted")
+    p.set_defaults(func=cmd_setpassword)
 
     p = sub.add_parser("listusers", help="List staff logins")
     p.set_defaults(func=cmd_listusers)

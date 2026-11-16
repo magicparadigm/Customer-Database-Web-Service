@@ -36,6 +36,7 @@ Want sample data to look at? `python manage.py seed --count 30`.
 | Command | Purpose |
 |---|---|
 | `python manage.py createuser` | Create a staff login (prompts for password if `--password` is omitted) |
+| `python manage.py setpassword` | Reset an existing login's password (prompts if `--password` is omitted) |
 | `python manage.py listusers` | List staff logins |
 | `python manage.py seed --count N` | Insert sample customers |
 
