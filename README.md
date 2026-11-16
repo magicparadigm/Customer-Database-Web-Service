@@ -6,7 +6,7 @@ A staff-facing customer database. The same records are available two ways:
 - **JSON API** at `/api/customers` — full CRUD, documented at `/docs`
 
 Both surfaces call the same logic in [`app/crud.py`](app/crud.py), so business rules exist in
-exactly one place. All routes require HTTP Basic Auth against a staff user.
+exactly one place. All routes require a signed-in staff user.
 
 ## Setup
 
@@ -15,9 +15,20 @@ python -m venv .venv
 .venv/Scripts/activate          # Windows;  source .venv/bin/activate elsewhere
 pip install -e ".[dev]"
 
-cp .env.example .env
+cp .env.example .env            # then edit SECRET_KEY
 alembic upgrade head
 python manage.py createuser     # prompts for username, email, password
+```
+
+Want staff to be able to sign in with Google instead of typing a password? Set
+`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in `.env` — see the comments in
+[`.env.example`](.env.example) for how to get them and which redirect URI to register.
+Leave them unset and the login page only shows the password form.
+
+Generate a real secret key for anything but local development:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
 ## Run
@@ -26,8 +37,7 @@ python manage.py createuser     # prompts for username, email, password
 uvicorn app.main:app --reload
 ```
 
-Then open http://127.0.0.1:8000 — your browser will prompt for the username/password from
-`createuser`.
+Then open http://127.0.0.1:8000 and sign in.
 
 Want sample data to look at? `python manage.py seed --count 30`.
 
@@ -43,7 +53,7 @@ Want sample data to look at? `python manage.py seed --count 30`.
 ## Tests
 
 ```bash
-pytest                                  # 46 tests
+pytest                                  # 57 tests
 pytest --cov=app --cov-report=term-missing
 ```
 
@@ -53,14 +63,14 @@ Tests run against a fresh in-memory SQLite database per test — they never touc
 
 ```
 app/
-  main.py          App, router wiring
+  main.py          App, session middleware, router wiring
   config.py        Settings from .env
   db.py            Engine, session factory, get_db dependency
   models.py        Customer, User
   schemas.py       Pydantic request/response models
   crud.py          Shared data-access and business logic
-  auth.py          Password hashing, HTTP Basic Auth, get_current_user
-  routers/         api_customers, web_customers
+  auth.py          Password hashing, sessions, get_current_user, OAuth identity linking
+  routers/         api_customers, web_customers, web_auth, oauth
   templates/       Jinja2 pages and HTMX fragments (_row, _rows)
   static/          style.css, vendored htmx.min.js
 alembic/           Migrations
@@ -79,15 +89,20 @@ filesystem doesn't persist SQLite files across deploys).
 4. Web service → **Variables**, set:
    - `ENVIRONMENT=production`
    - `DEBUG=false`
-5. Deploy. [`railway.toml`](railway.toml)'s `preDeployCommand` runs `alembic upgrade head` before
-   the new instance takes traffic — check the deploy log for it.
+   - `SECRET_KEY=` output of `python -c "import secrets; print(secrets.token_urlsafe(48))"`
+     (the app refuses to start in production with the placeholder key)
+   - Optionally `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` to enable Google sign-in — register
+     `https://<your-app>.up.railway.app/auth/google/callback` as an authorized redirect URI for
+     that OAuth client first.
+5. Deploy. The [`Procfile`](Procfile)'s `release:` line runs `alembic upgrade head` before the
+   new `web:` process takes traffic — check the build log for it.
 6. Create the first login against the live database, one time, via the Railway CLI:
    ```bash
    railway login
    railway link            # pick this project
-   railway ssh python manage.py createuser
+   railway run python manage.py createuser
    ```
-7. Visit the assigned `*.up.railway.app` domain — your browser will prompt for those credentials.
+7. Visit the assigned `*.up.railway.app` domain and sign in.
 
 [`railway.toml`](railway.toml) points Railway's healthcheck at `/healthz` and restarts on failure.
 
@@ -98,13 +113,17 @@ Alembic, and only `DATABASE_URL` names the backend. Moving to Postgres or SQL Se
 changing that value and reviewing the migrations — install the matching driver
 (`psycopg`, `pyodbc`) and run `alembic upgrade head` against the new database.
 
-**HTTP Basic Auth, not sessions.** Every request carries an `Authorization: Basic` header,
-checked against Argon2-hashed passwords on each call — there's no server-side session state to
-manage or expire. The trade-off: no custom login page (the browser's native credential prompt
-handles that) and no real server-side logout — a browser holds onto credentials for an origin
-until it's closed. `get_current_user` (in [`app/auth.py`](app/auth.py)) is the single dependency
-both the web UI and the JSON API rely on, so a request either surface can't authenticate is
-rejected the same way: `401` plus a `WWW-Authenticate: Basic` header.
+**Sessions, not JWT.** The UI is a browser tool, so it uses a signed HTTP-only session cookie —
+simpler and revocable. Passwords are hashed with Argon2.
+
+**OAuth links accounts, it doesn't create them.** Signing in with Google matches the verified
+email from Google against an existing `users` row and links it (`oauth_provider`/`oauth_subject`)
+on first use — it never provisions a new staff account on its own. Access is still controlled by
+who an admin ran `manage.py createuser` for; OAuth just adds a second way to prove you're them.
+
+**Auth failures differ by surface.** Anything under `/api` gets a `401`; everything else
+redirects to `/login?next=…`. That split is by path, deliberately, rather than by sniffing the
+`Accept` header.
 
 **HTMX returns fragments.** `/customers/search` renders `_rows.html` alone, with no page layout,
 so search results swap in without a reload. Delete swaps out a single `<tr>`.

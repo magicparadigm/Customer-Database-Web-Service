@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Index, String, Text, func
+from sqlalchemy import Boolean, DateTime, Index, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -56,6 +56,15 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Set on first successful OAuth sign-in that links to this account (see
+    # auth.find_user_for_oauth_identity). Both stay null for password-only staff.
+    oauth_provider: Mapped[str | None] = mapped_column(String(50), default=None)
+    oauth_subject: Mapped[str | None] = mapped_column(String(255), default=None)
+
+    __table_args__ = (
+        UniqueConstraint("oauth_provider", "oauth_subject", name="uq_users_oauth_identity"),
     )
 
     def __repr__(self) -> str:
