@@ -7,6 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db
+from app.google_token import (
+    ApiCaller,
+    GoogleTokenCheckUnavailable,
+    InvalidGoogleToken,
+    verify_api_token,
+)
 from app.models import User
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
@@ -124,6 +130,37 @@ def get_current_user(
         raise NotAuthenticatedError
 
     return user
+
+
+def get_api_caller(
+    request: Request, db: Session = Depends(get_db)
+) -> User | ApiCaller:
+    """Authenticate a /api request by Google Bearer token or, failing that, session.
+
+    A request that presents a Bearer token is judged on that token alone: a bad
+    token is a 401 even if a valid session cookie rides along. No Authorization
+    header at all falls through to the normal session check.
+    """
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() != "bearer":
+        return get_current_user(request, db)
+
+    challenge = {"WWW-Authenticate": "Bearer"}
+    token = token.strip()
+    if not token:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "Invalid bearer token", headers=challenge
+        )
+    try:
+        return verify_api_token(token)
+    except InvalidGoogleToken:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "Invalid bearer token", headers=challenge
+        ) from None
+    except GoogleTokenCheckUnavailable:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Token verification unavailable"
+        ) from None
 
 
 def safe_next(next_url: str | None) -> str:

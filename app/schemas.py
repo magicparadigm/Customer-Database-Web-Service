@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class CustomerBase(BaseModel):
@@ -45,6 +45,28 @@ class CustomerRead(CustomerBase):
     id: int
     created_at: datetime
     updated_at: datetime
+
+
+class NameVerificationRequest(BaseModel):
+    full_name: str = Field(max_length=201)  # first (100) + space + last (100)
+
+    @field_validator("full_name")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("full_name must not be blank")
+        return normalized
+
+
+class NameVerificationResult(BaseModel):
+    """`found`: exactly one customer has that name. `verified`: found and active."""
+
+    found: bool
+    verified: bool
+    id: int | None = None
+    email: str | None = None
+    company: str | None = None
 
 
 class CustomerPage(BaseModel):

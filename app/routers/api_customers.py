@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app import crud
-from app.auth import get_current_user
+from app.auth import get_api_caller
 from app.db import get_db
 from app.schemas import CustomerCreate, CustomerPage, CustomerRead, CustomerUpdate
 
 router = APIRouter(
     prefix="/api/customers",
     tags=["customers"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(get_api_caller)],
 )
 
 

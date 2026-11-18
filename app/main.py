@@ -7,7 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import NotAuthenticatedError, login_redirect
 from app.config import settings
-from app.routers import api_customers, oauth, web_auth, web_customers
+from app.routers import api_customers, api_verify, oauth, web_auth, web_customers
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -39,6 +39,7 @@ app.include_router(web_auth.router)
 app.include_router(oauth.router)
 app.include_router(web_customers.router)
 app.include_router(api_customers.router)
+app.include_router(api_verify.router)
 
 
 @app.get("/", include_in_schema=False)

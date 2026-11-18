@@ -1,0 +1,39 @@
+{
+  "name": "Customer Database Verification",
+  "description": "Verifies a signer's full name against the customer database.",
+  "version": "0.1.0",
+  "connections": [
+    {
+      "name": "google",
+      "type": "oauth2",
+      "grantType": "authorization_code",
+      "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+      "tokenUrl": "https://oauth2.googleapis.com/token",
+      "clientId": "REPLACE_WITH_GOOGLE_CLIENT_ID",
+      "scopes": ["openid", "email"],
+      "authorizationParams": {
+        "access_type": "offline",
+        "prompt": "consent"
+      }
+    }
+  ],
+  "actions": [
+    {
+      "name": "verifyCustomerName",
+      "connection": "google",
+      "request": {
+        "method": "POST",
+        "url": "https://REPLACE_WITH_APP_HOST/api/verify",
+        "headers": { "Content-Type": "application/json" },
+        "body": { "full_name": "{{fullName}}" }
+      },
+      "response": {
+        "found": "found",
+        "verified": "verified",
+        "id": "id",
+        "email": "email",
+        "company": "company"
+      }
+    }
+  ]
+}

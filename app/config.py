@@ -9,6 +9,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 _DEV_SECRET_KEY = "dev-only-insecure-change-me"
 
 
+def _split_csv(raw: str) -> list[str]:
+    return [item.strip().lower() for item in raw.split(",") if item.strip()]
+
+
 class Settings(BaseSettings):
     """Application settings, read from the environment or a .env file."""
 
@@ -41,6 +45,20 @@ class Settings(BaseSettings):
     @property
     def google_oauth_enabled(self) -> bool:
         return bool(self.google_client_id and self.google_client_secret)
+
+    # Google accounts allowed to call /api with a Bearer token. Comma-separated.
+    # Both empty means Bearer access is refused for everyone. GOOGLE_CLIENT_ID is
+    # the audience a token must have been issued to.
+    api_allowed_email_domains: str = ""
+    api_allowed_emails: str = ""
+
+    @property
+    def allowed_api_domains(self) -> frozenset[str]:
+        return frozenset(_split_csv(self.api_allowed_email_domains))
+
+    @property
+    def allowed_api_emails(self) -> frozenset[str]:
+        return frozenset(_split_csv(self.api_allowed_emails))
 
     @model_validator(mode="after")
     def _reject_dev_secret_in_production(self) -> "Settings":

@@ -125,6 +125,14 @@ who an admin ran `manage.py createuser` for; OAuth just adds a second way to pro
 redirects to `/login?next=…`. That split is by path, deliberately, rather than by sniffing the
 `Accept` header.
 
+**Bearer tokens are for machines, and they're narrow.** `/api/*` also accepts
+`Authorization: Bearer <google-access-token>`. The token must have been issued to
+`GOOGLE_CLIENT_ID` (checked via Google's tokeninfo endpoint), carry a verified email, and
+that email must be on `API_ALLOWED_EMAIL_DOMAINS` / `API_ALLOWED_EMAILS`. Bearer callers
+are not `users` rows and never touch the session. `POST /api/verify` is the lookup the
+DocuSign extension uses: exact, case-insensitive full-name match; inactive or ambiguous
+matches come back unverified.
+
 **HTMX returns fragments.** `/customers/search` renders `_rows.html` alone, with no page layout,
 so search results swap in without a reload. Delete swaps out a single `<tr>`.
 

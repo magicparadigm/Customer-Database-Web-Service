@@ -33,6 +33,21 @@ def get_customer(db: Session, customer_id: int) -> Customer | None:
     return db.get(Customer, customer_id)
 
 
+def find_customers_by_full_name(
+    db: Session, full_name: str, limit: int = 2
+) -> list[Customer]:
+    """Customers whose "first last" equals `full_name`, ignoring case.
+
+    Exact match only — no partial or fuzzy matching. Runs of whitespace in the
+    input are collapsed to one space first. The default limit of 2 is enough for a
+    caller to tell "one match" from "ambiguous" without pulling every duplicate.
+    """
+    wanted = " ".join(full_name.split()).lower()
+    stored = func.lower(Customer.first_name + " " + Customer.last_name)
+    stmt = select(Customer).where(stored == wanted).order_by(Customer.id).limit(limit)
+    return list(db.scalars(stmt))
+
+
 def list_customers(
     db: Session,
     *,
