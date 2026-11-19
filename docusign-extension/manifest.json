@@ -1,39 +1,72 @@
 {
-  "name": "Customer Database Verification",
-  "description": "Verifies a signer's full name against the customer database.",
-  "version": "0.1.0",
+  "name": "Customer Name Verification",
+  "distribution": "PRIVATE",
+  "description": {
+    "short": "Verifies a signer's full name against the customer database.",
+    "long": "Adds a Customer Full Name field to envelopes. When the signer fills it in, the name is checked against the customer database: an exact, case-insensitive match against an active customer passes."
+  },
+  "publicationRegions": ["US"],
+  "termsOfServiceUrl": "REPLACE_WITH_TERMS_URL",
+  "privacyUrl": "REPLACE_WITH_PRIVACY_URL",
+  "supportUrl": "REPLACE_WITH_SUPPORT_URL",
+  "publisher": {
+    "name": "REPLACE_WITH_PUBLISHER_NAME",
+    "email": "REPLACE_WITH_PUBLISHER_EMAIL"
+  },
   "connections": [
     {
       "name": "google",
+      "description": "Sign in with Google so the app can call the customer database",
       "type": "oauth2",
-      "grantType": "authorization_code",
-      "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
-      "tokenUrl": "https://oauth2.googleapis.com/token",
-      "clientId": "REPLACE_WITH_GOOGLE_CLIENT_ID",
-      "scopes": ["openid", "email"],
-      "authorizationParams": {
-        "access_type": "offline",
-        "prompt": "consent"
+      "params": {
+        "provider": "CUSTOM",
+        "clientId": "REPLACE_WITH_GOOGLE_CLIENT_ID",
+        "clientSecret": "REPLACE_WITH_GOOGLE_CLIENT_SECRET",
+        "scopes": ["openid", "email"],
+        "grantType": "authorization_code",
+        "customConfig": {
+          "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+          "tokenUrl": "https://oauth2.googleapis.com/token",
+          "authorizationMethod": "body",
+          "scopeSeparator": " ",
+          "authorizationParams": {
+            "access_type": "offline",
+            "prompt": "consent"
+          }
+        }
       }
+    }
+  ],
+  "extensions": [
+    {
+      "name": "Customer Name Verification",
+      "description": "Verifies a full name against the customer database",
+      "template": "ConnectedFields.Version1.ConnectedFields",
+      "actionReferences": ["get-type-names", "get-type-definitions", "verify"],
+      "capabilities": []
     }
   ],
   "actions": [
     {
-      "name": "verifyCustomerName",
-      "connection": "google",
-      "request": {
-        "method": "POST",
-        "url": "https://REPLACE_WITH_APP_HOST/api/verify",
-        "headers": { "Content-Type": "application/json" },
-        "body": { "full_name": "{{fullName}}" }
-      },
-      "response": {
-        "found": "found",
-        "verified": "verified",
-        "id": "id",
-        "email": "email",
-        "company": "company"
-      }
+      "name": "get-type-names",
+      "description": "Lists the data types that can be verified",
+      "template": "DataIO.Version6.GetTypeNames",
+      "connectionsReference": "google",
+      "params": { "uri": "https://REPLACE_WITH_APP_HOST/api/connected-fields/type-names" }
+    },
+    {
+      "name": "get-type-definitions",
+      "description": "Returns the fields of each verifiable type",
+      "template": "DataIO.Version6.GetTypeDefinitions",
+      "connectionsReference": "google",
+      "params": { "uri": "https://REPLACE_WITH_APP_HOST/api/connected-fields/type-definitions" }
+    },
+    {
+      "name": "verify",
+      "description": "Checks a full name against the customer database",
+      "template": "ConnectedFields.Version1.Verify",
+      "connectionsReference": "google",
+      "params": { "uri": "https://REPLACE_WITH_APP_HOST/api/connected-fields/verify" }
     }
   ]
 }

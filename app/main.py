@@ -1,13 +1,22 @@
 from pathlib import Path
 
 from fastapi import FastAPI, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import NotAuthenticatedError, login_redirect
 from app.config import settings
-from app.routers import api_customers, api_verify, oauth, web_auth, web_customers
+from app.routers import (
+    api_connected_fields,
+    api_customers,
+    api_verify,
+    oauth,
+    web_auth,
+    web_customers,
+)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -35,11 +44,30 @@ async def _redirect_to_login(request: Request, _exc: NotAuthenticatedError):
     return login_redirect(request)
 
 
+@app.exception_handler(RequestValidationError)
+async def _bad_request_for_docusign(request: Request, exc: RequestValidationError):
+    """DocuSign's contract allows only 400/404/500 for unprocessable calls, not 422.
+
+    Scoped to the connected-fields routes; every other route keeps FastAPI's 422.
+    """
+    if request.url.path.startswith("/api/connected-fields"):
+        problems = "; ".join(
+            f"{'.'.join(str(part) for part in err['loc'][1:])}: {err['msg']}"
+            for err in exc.errors()
+        )
+        return JSONResponse(
+            {"code": "BAD_REQUEST", "message": f"Invalid request body. {problems}"},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    return await request_validation_exception_handler(request, exc)
+
+
 app.include_router(web_auth.router)
 app.include_router(oauth.router)
 app.include_router(web_customers.router)
 app.include_router(api_customers.router)
 app.include_router(api_verify.router)
+app.include_router(api_connected_fields.router)
 
 
 @app.get("/", include_in_schema=False)

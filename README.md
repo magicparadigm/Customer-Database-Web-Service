@@ -129,9 +129,10 @@ redirects to `/login?next=…`. That split is by path, deliberately, rather than
 `Authorization: Bearer <google-access-token>`. The token must have been issued to
 `GOOGLE_CLIENT_ID` (checked via Google's tokeninfo endpoint), carry a verified email, and
 that email must be on `API_ALLOWED_EMAIL_DOMAINS` / `API_ALLOWED_EMAILS`. Bearer callers
-are not `users` rows and never touch the session. `POST /api/verify` is the lookup the
-DocuSign extension uses: exact, case-insensitive full-name match; inactive or ambiguous
-matches come back unverified.
+are not `users` rows and never touch the session. The DocuSign Connected Fields extension
+(`docusign-extension/`) calls `/api/connected-fields/*`; its verify step is an exact,
+case-insensitive full-name match, and inactive or ambiguous matches come back unverified.
+`POST /api/verify` is the same lookup as a plain JSON endpoint.
 
 **HTMX returns fragments.** `/customers/search` renders `_rows.html` alone, with no page layout,
 so search results swap in without a reload. Delete swaps out a single `<tr>`.
