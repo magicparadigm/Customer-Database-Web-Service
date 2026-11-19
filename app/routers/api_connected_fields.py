@@ -32,6 +32,7 @@ router = APIRouter(
 
 TYPE_NAME = "customer"
 FIELD_NAME = "full_name"
+COMPANY_FIELD = "company"
 
 # Shown to the signer on any failed check. Deliberately identical for "no such
 # customer", "several customers" and "inactive customer": the signer is not
@@ -76,7 +77,16 @@ def _customer_declaration() -> dict:
                     _decorator("IsRequiredForVerifyingType"),
                     _decorator("Term", "Full Name"),
                 ],
-            }
+            },
+            {
+                # Optional on the way in. It never decides whether a name verifies; it
+                # is the field DocuSign fills from the matched customer's record.
+                "$class": f"{_C}.StringProperty",
+                "name": COMPANY_FIELD,
+                "isOptional": True,
+                "isArray": False,
+                "decorators": [_decorator("Term", "Company")],
+            },
         ],
     }
 
@@ -107,6 +117,7 @@ class VerifyResponse(BaseModel):
     verifyFailureReason: str | None = None
     verificationResultCode: str | None = None
     passthroughResponseData: dict[str, Any] | None = None
+    suggestions: list[dict[str, Any]] | None = None
 
 
 @router.post("/type-names")
@@ -168,11 +179,20 @@ def verify(data: VerifyRequest, db: Session = Depends(get_db)):
     if result_code == "INACTIVE":
         return _not_verified(result_code, details)
 
+    # Autofill: the entered name (which passed) plus the matched customer's company.
+    # The contract requires every required property in a suggestion, so full_name is
+    # always included. Only a verified customer gets suggestions: an inactive or
+    # ambiguous match must not reveal anything about a record.
+    suggestion: dict[str, Any] = {FIELD_NAME: " ".join(full_name.split())}
+    if customer.company:
+        suggestion[COMPANY_FIELD] = customer.company
+
     return VerifyResponse(
         verified=True,
         verifyResponseMessage="Name verified.",
         verificationResultCode="VERIFIED",
         passthroughResponseData=details,
+        suggestions=[suggestion],
     )
 
 

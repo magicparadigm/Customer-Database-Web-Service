@@ -40,7 +40,7 @@ def test_type_names_lists_the_customer_type(auth_client):
 # --- Get Type Definitions ---------------------------------------------------------
 
 
-def test_type_definition_is_a_verifiable_concept_with_one_required_field(auth_client):
+def test_type_definition_is_a_verifiable_concept_with_full_name_required(auth_client):
     body = auth_client.post(f"{BASE}/type-definitions", json={"typeNames": ["customer"]}).json()
 
     assert body["errors"] == []
@@ -49,11 +49,21 @@ def test_type_definition_is_a_verifiable_concept_with_one_required_field(auth_cl
     assert decl["name"] == "customer"
     assert "VerifiableType" in [d["name"] for d in decl["decorators"]]
 
-    (prop,) = decl["properties"]
-    assert prop["name"] == "full_name"
-    assert prop["$class"] == "concerto.metamodel@1.0.0.StringProperty"
-    assert prop["isOptional"] is False
-    assert "IsRequiredForVerifyingType" in [d["name"] for d in prop["decorators"]]
+    props = {p["name"]: p for p in decl["properties"]}
+    assert set(props) == {"full_name", "company"}
+
+    full_name = props["full_name"]
+    assert full_name["$class"] == "concerto.metamodel@1.0.0.StringProperty"
+    assert full_name["isOptional"] is False
+    assert "IsRequiredForVerifyingType" in [d["name"] for d in full_name["decorators"]]
+
+
+def test_company_is_optional_and_not_required_for_verifying(auth_client):
+    body = auth_client.post(f"{BASE}/type-definitions", json={"typeNames": ["customer"]}).json()
+    (decl,) = body["declarations"]
+    company = next(p for p in decl["properties"] if p["name"] == "company")
+    assert company["isOptional"] is True
+    assert "IsRequiredForVerifyingType" not in [d["name"] for d in company["decorators"]]
 
 
 def test_type_definition_has_no_crud_decorators(auth_client):
@@ -334,3 +344,85 @@ def test_search_malformed_body_is_400_not_422(auth_client):
     response = auth_client.post(f"{BASE}/search-records", json={"pagination": {}})
     assert response.status_code == 400
     assert response.json()["code"] == "BAD_REQUEST"
+
+
+# --- Company autofill (suggestions) -------------------------------------------------
+
+
+def verify_with(client, data):
+    return client.post(
+        f"{BASE}/verify",
+        json={"typeName": "customer", "idempotencyKey": "k-1", "data": data},
+    )
+
+
+def test_verified_customer_gets_company_as_an_autofill_suggestion(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com", company="Analytical Engines")
+
+    body = verify(auth_client, "Ada Lovelace").json()
+
+    assert body["verified"] is True
+    assert body["suggestions"] == [{"full_name": "Ada Lovelace", "company": "Analytical Engines"}]
+
+
+def test_suggestion_always_includes_the_required_full_name(auth_client, db_session):
+    """DocuSign's contract: a suggestion must carry every required property."""
+    add(db_session, "Ada", "Lovelace", "ada@example.com", company="Analytical Engines")
+
+    (suggestion,) = verify(auth_client, "Ada Lovelace").json()["suggestions"]
+
+    assert "full_name" in suggestion
+
+
+def test_suggestion_echoes_the_name_as_typed_not_the_stored_casing(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com", company="Analytical Engines")
+
+    (suggestion,) = verify(auth_client, "  ada   LOVELACE ").json()["suggestions"]
+
+    assert suggestion["full_name"] == "ada LOVELACE"  # whitespace tidied, casing untouched
+
+
+def test_customer_without_a_company_gets_only_the_name_back(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com", company=None)
+
+    body = verify(auth_client, "Ada Lovelace").json()
+
+    assert body["verified"] is True
+    assert body["suggestions"] == [{"full_name": "Ada Lovelace"}]
+
+
+def test_company_typed_by_the_signer_does_not_decide_the_outcome(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com", company="Analytical Engines")
+
+    body = verify_with(
+        auth_client, {"full_name": "Ada Lovelace", "company": "Some Other Company"}
+    ).json()
+
+    assert body["verified"] is True
+    # The stored value is offered, so a wrong entry is corrected by autofill.
+    assert body["suggestions"][0]["company"] == "Analytical Engines"
+
+
+def test_omitting_company_is_fine(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com", company="Analytical Engines")
+    assert verify_with(auth_client, {"full_name": "Ada Lovelace"}).json()["verified"] is True
+
+
+def test_unverified_results_never_include_suggestions(auth_client, db_session):
+    add(db_session, "Ina", "Gone", "ina@example.com", company="Hidden Co", active=False)
+    add(db_session, "Sam", "Lee", "sam1@example.com", company="Dup One")
+    add(db_session, "Sam", "Lee", "sam2@example.com", company="Dup Two")
+
+    for name in ("Nobody Here", "Ina Gone", "Sam Lee"):
+        body = verify(auth_client, name).json()
+        assert body["verified"] is False, name
+        assert "suggestions" not in body, name
+        assert "Hidden Co" not in str(body["verifyFailureReason"]), name
+
+
+def test_suggestion_exposes_no_email_or_id(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com", company="Analytical Engines")
+
+    (suggestion,) = verify(auth_client, "Ada Lovelace").json()["suggestions"]
+
+    assert set(suggestion) <= {"full_name", "company"}
