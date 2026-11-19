@@ -14,6 +14,7 @@ from app.routers import (
     api_customers,
     api_verify,
     oauth,
+    public_pages,
     web_auth,
     web_customers,
 )
@@ -62,6 +63,7 @@ async def _bad_request_for_docusign(request: Request, exc: RequestValidationErro
     return await request_validation_exception_handler(request, exc)
 
 
+app.include_router(public_pages.router)
 app.include_router(web_auth.router)
 app.include_router(oauth.router)
 app.include_router(web_customers.router)

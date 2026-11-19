@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     api_allowed_email_domains: str = ""
     api_allowed_emails: str = ""
 
+    # Shown on the public support page. Blank shows the page without an address.
+    support_email: str = ""
+
     @property
     def allowed_api_domains(self) -> frozenset[str]:
         return frozenset(_split_csv(self.api_allowed_email_domains))

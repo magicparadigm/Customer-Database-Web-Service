@@ -176,6 +176,13 @@ button.danger { color: var(--danger); }
   content: ""; flex: 1; height: 1px; background: var(--border);
 }
 
+/* Public legal pages */
+.legal { max-width: 720px; margin: 0 auto; }
+.legal h1 { margin-bottom: 4px; }
+.legal h2 { font-size: 1.05rem; margin: 28px 0 6px; }
+.legal p, .legal li { margin: 0 0 10px; }
+.legal ul { padding-left: 20px; }
+
 /* HTMX */
 .htmx-indicator { opacity: 0; transition: opacity .2s; font-size: .85rem; }
 .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }

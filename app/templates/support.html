@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Support — Customer Database{% endblock %}
+
+{% block content %}
+<article class="legal">
+  <h1>Support</h1>
+
+  <h2>Contact us</h2>
+  {% if support_email %}
+  <p>Email <a href="mailto:{{ support_email }}">{{ support_email }}</a> and include a short
+    description of the problem.</p>
+  {% else %}
+  <p>Contact the administrator who gave you access to the Customer Database service.</p>
+  {% endif %}
+
+  <h2>Common questions</h2>
+  <ul>
+    <li><strong>I can't sign in with Google.</strong> Your Google account must be approved by the
+      administrator. Ask them to check that your account email has been added.</li>
+    <li><strong>DocuSign says verification failed for a name I expected to match.</strong> The
+      name must match the customer record exactly, ignoring capital letters and extra spaces.
+      Inactive customers and names shared by more than one customer are never verified.</li>
+    <li><strong>I want my data corrected or removed.</strong> Contact us using the details above,
+      and include the name and email address on the record.</li>
+  </ul>
+</article>
+{% endblock %}

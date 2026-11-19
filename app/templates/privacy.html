@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Privacy Policy — Customer Database{% endblock %}
+
+{% block content %}
+<article class="legal">
+  <h1>Privacy Policy</h1>
+  <p class="muted">Last updated 19 November 2026</p>
+
+  <p>
+    This page describes what personal information the Customer Database service handles, why,
+    and who it is shared with.
+  </p>
+
+  <h2>What we handle</h2>
+  <ul>
+    <li><strong>Staff account details:</strong> a username, a hashed password, and, if you sign
+      in with Google, your Google account ID and email address.</li>
+    <li><strong>Customer records:</strong> names, email addresses, phone numbers, companies,
+      postal addresses and notes that staff enter.</li>
+    <li><strong>Verification requests:</strong> when DocuSign checks a name, the name is compared
+      with the customer records. The result, and the matched customer's ID, email and company,
+      are returned to DocuSign. The signer is shown only a generic result.</li>
+    <li><strong>Service logs:</strong> the request path, response status, the requesting network
+      address, and the reason an
+      access attempt was refused, such as an email address that is not on the allowed list. Access
+      tokens are never logged.</li>
+  </ul>
+
+  <h2>Why we use it</h2>
+  <p>
+    To sign staff in, to keep customer records, to answer verification requests, and to keep the
+    service secure and working.
+  </p>
+
+  <h2>Who we share it with</h2>
+  <ul>
+    <li><strong>Google:</strong> to sign staff in, and to check the access tokens that DocuSign
+      presents.</li>
+    <li><strong>DocuSign:</strong> the verification results described above, when the DocuSign
+      extension is used.</li>
+    <li><strong>Our hosting providers:</strong> Railway, which runs the application and its
+      database.</li>
+  </ul>
+  <p>We do not sell personal information.</p>
+
+  <h2>How long we keep it</h2>
+  <p>[To be completed: retention periods for customer records, account records and logs.]</p>
+
+  <h2>Security</h2>
+  <p>
+    Passwords are stored as salted hashes. Sessions use signed cookies, and in production the
+    service is served over HTTPS. Access to the API from outside the staff web interface is limited
+    to approved accounts.
+  </p>
+
+  <h2>Your rights</h2>
+  <p>
+    To ask what we hold about you, or to ask for a correction or deletion, use the
+    <a href="/support">support page</a>.
+  </p>
+
+  <h2>Changes</h2>
+  <p>We will update this page when the way we handle personal information changes.</p>
+</article>
+{% endblock %}
