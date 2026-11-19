@@ -1,9 +1,11 @@
-"""DocuSign Connected Fields extension: the three calls DocuSign makes to this service.
+"""DocuSign Connected Fields app: the four calls DocuSign makes to this service.
 
-DocuSign POSTs to each of these (see docusign-extension/manifest.json):
+DocuSign POSTs to each of these (see docusign-extension/manifest.json). The first three
+belong to a Data IO extension, the last to a Connected Fields extension:
 
-* type-names        — which data types can be verified            (DataIO...GetTypeNames)
+* type-names        — which data types exist                       (DataIO...GetTypeNames)
 * type-definitions  — the fields of those types, as Concerto JSON  (DataIO...GetTypeDefinitions)
+* search-records    — find a record by a filter                    (DataIO...SearchRecords)
 * verify            — check one entered value                      (ConnectedFields...Verify)
 
 We expose a single type, `customer`, with a single field, `full_name`. Verification is
@@ -20,6 +22,7 @@ from sqlalchemy.orm import Session
 from app import crud
 from app.auth import get_api_caller
 from app.db import get_db
+from app.models import Customer
 
 router = APIRouter(
     prefix="/api/connected-fields",
@@ -87,6 +90,11 @@ class TypeDefinitionsRequest(BaseModel):
     typeNames: list[str]
 
 
+class SearchRequest(BaseModel):
+    query: dict[str, Any]
+    pagination: dict[str, Any] | None = None
+
+
 class VerifyRequest(BaseModel):
     typeName: str
     idempotencyKey: str
@@ -146,23 +154,19 @@ def verify(data: VerifyRequest, db: Session = Depends(get_db)):
     if not isinstance(full_name, str) or not full_name.strip():
         return _error(400, "BAD_REQUEST", f"data.{FIELD_NAME} is required")
 
-    matches = crud.find_customers_by_full_name(db, full_name)
+    result_code, customer = _lookup(db, full_name)
 
-    if not matches:
-        return _not_verified("NOT_FOUND", {"found": False})
-    if len(matches) > 1:
-        # Can't be tied to one person; treated as not found, as in POST /api/verify.
-        return _not_verified("AMBIGUOUS", {"found": False})
+    if customer is None:
+        return _not_verified(result_code, {"found": False})
 
-    customer = matches[0]
     details = {
         "found": True,
         "id": customer.id,
         "email": customer.email,
         "company": customer.company,
     }
-    if not customer.is_active:
-        return _not_verified("INACTIVE", details)
+    if result_code == "INACTIVE":
+        return _not_verified(result_code, details)
 
     return VerifyResponse(
         verified=True,
@@ -170,6 +174,87 @@ def verify(data: VerifyRequest, db: Session = Depends(get_db)):
         verificationResultCode="VERIFIED",
         passthroughResponseData=details,
     )
+
+
+def _lookup(db: Session, full_name: str) -> tuple[str, Customer | None]:
+    """Shared by verify and search so they can never disagree.
+
+    Returns (code, customer). Codes: VERIFIED, INACTIVE (customer set), NOT_FOUND,
+    AMBIGUOUS (customer None — several customers share the name, so it can't be tied
+    to one person and is treated as not found).
+    """
+    matches = crud.find_customers_by_full_name(db, full_name)
+    if not matches:
+        return "NOT_FOUND", None
+    if len(matches) > 1:
+        return "AMBIGUOUS", None
+    customer = matches[0]
+    return ("VERIFIED" if customer.is_active else "INACTIVE"), customer
+
+
+class _UnsupportedQuery(ValueError):
+    pass
+
+
+def _full_name_from_query(query: dict[str, Any]) -> str:
+    """The name in a `full_name EQUALS <literal>` filter.
+
+    That is the only query this service answers. A missing filter or any other field
+    or operator is refused rather than approximated, because a looser search would let
+    a caller enumerate customers by guessing prefixes.
+    """
+    unsupported = _UnsupportedQuery(
+        f"Only a {FIELD_NAME} EQUALS <value> filter is supported."
+    )
+    try:
+        operation = query["queryFilter"]["operation"]
+        left, right = operation["leftOperand"], operation["rightOperand"]
+        operator = operation["operator"]
+    except (KeyError, TypeError):
+        raise unsupported from None
+
+    if (
+        operator != "EQUALS"
+        or not isinstance(left, dict)
+        or not isinstance(right, dict)
+        or left.get("name") != FIELD_NAME
+        or left.get("isLiteral")
+        or not right.get("isLiteral")
+        or not isinstance(right.get("name"), str)
+    ):
+        raise unsupported
+    return right["name"]
+
+
+@router.post("/search-records")
+def search_records(data: SearchRequest, db: Session = Depends(get_db)):
+    """DataIO Search Records: find the customer whose full_name equals a value.
+
+    Returns at most one record, `{"full_name": ...}`, and only when verify would pass
+    (exactly one active customer has that name). No match is `{"records": []}`, never
+    a 404, as the contract requires. Email, company and id are not returned here.
+    """
+    if data.query.get("from") != TYPE_NAME:
+        return _error(404, "NOT_FOUND", f"Unknown type {data.query.get('from')!r}")
+
+    try:
+        full_name = _full_name_from_query(data.query)
+    except _UnsupportedQuery as exc:
+        return _error(400, "BAD_REQUEST", str(exc))
+
+    pagination = data.pagination or {}
+    skip, limit = pagination.get("skip", 0), pagination.get("limit")
+    if (isinstance(skip, int) and skip > 0) or limit == 0:
+        return {"records": []}  # the single possible record is on page one only
+
+    result_code, customer = _lookup(db, full_name)
+    if result_code != "VERIFIED" or customer is None:
+        return {"records": []}
+
+    available = {FIELD_NAME: customer.full_name}
+    wanted = data.query.get("attributesToSelect") or [FIELD_NAME]
+    record = {k: available[k] for k in wanted if isinstance(k, str) and k in available}
+    return {"records": [record]}
 
 
 def _not_verified(result_code: str, details: dict) -> VerifyResponse:

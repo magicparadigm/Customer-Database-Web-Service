@@ -27,8 +27,9 @@
         "customConfig": {
           "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
           "tokenUrl": "https://oauth2.googleapis.com/token",
-          "authorizationMethod": "body",
+          "authorizationMethod": "header",
           "scopeSeparator": " ",
+          "requiredScopes": [],
           "authorizationParams": {
             "access_type": "offline",
             "prompt": "consent"
@@ -39,10 +40,17 @@
   ],
   "extensions": [
     {
+      "name": "Customer Data",
+      "description": "Lets DocuSign look up customer records and field definitions",
+      "template": "DataIO.Version6.DataInputOutput",
+      "actionReferences": ["get-type-names", "get-type-definitions", "search-records"],
+      "capabilities": []
+    },
+    {
       "name": "Customer Name Verification",
       "description": "Verifies a full name against the customer database",
       "template": "ConnectedFields.Version1.ConnectedFields",
-      "actionReferences": ["get-type-names", "get-type-definitions", "verify"],
+      "actionReferences": ["verify"],
       "capabilities": []
     }
   ],
@@ -60,6 +68,13 @@
       "template": "DataIO.Version6.GetTypeDefinitions",
       "connectionsReference": "google",
       "params": { "uri": "https://REPLACE_WITH_APP_HOST/api/connected-fields/type-definitions" }
+    },
+    {
+      "name": "search-records",
+      "description": "Finds a customer whose full name matches exactly",
+      "template": "DataIO.Version6.SearchRecords",
+      "connectionsReference": "google",
+      "params": { "uri": "https://REPLACE_WITH_APP_HOST/api/connected-fields/search-records" }
     },
     {
       "name": "verify",

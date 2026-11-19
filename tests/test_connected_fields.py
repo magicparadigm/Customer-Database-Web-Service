@@ -205,3 +205,132 @@ def test_unauthenticated_malformed_body_is_still_401(client):
 
 def test_other_routes_keep_the_default_422(auth_client):
     assert auth_client.post("/api/verify", json={}).status_code == 422
+
+
+# --- Search Records (DataIO) -------------------------------------------------------
+
+CLASS = "com.docusign.connected.data.queries@1.0.0"
+
+
+def search_query(value="Ada Lovelace", *, field="full_name", operator="EQUALS", **extra):
+    query = {
+        "$class": f"{CLASS}.Query",
+        "attributesToSelect": ["full_name"],
+        "from": "customer",
+        "queryFilter": {
+            "$class": f"{CLASS}.QueryFilter",
+            "operation": {
+                "$class": f"{CLASS}.ComparisonOperation",
+                "leftOperand": {
+                    "$class": f"{CLASS}.Operand", "name": field, "type": "STRING",
+                    "isLiteral": False,
+                },
+                "operator": operator,
+                "rightOperand": {
+                    "$class": f"{CLASS}.Operand", "name": value, "type": "STRING",
+                    "isLiteral": True,
+                },
+            },
+        },
+    }
+    query.update(extra)
+    return query
+
+
+def search(client, query=None, pagination=None):
+    return client.post(
+        f"{BASE}/search-records",
+        json={"query": query or search_query(), "pagination": pagination or {"limit": 5, "skip": 0}},
+    )
+
+
+def test_search_requires_authentication(client):
+    assert client.post(f"{BASE}/search-records", json={}).status_code == 401
+
+
+def test_search_finds_exactly_one_active_match(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com", company="Analytical Engines")
+
+    response = search(auth_client, search_query("ada LOVELACE"))
+
+    assert response.status_code == 200
+    assert response.json() == {"records": [{"full_name": "Ada Lovelace"}]}
+
+
+def test_search_never_returns_email_company_or_id(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com", company="Analytical Engines")
+
+    query = search_query(attributesToSelect=["full_name", "email", "company", "id"])
+    record = search(auth_client, query).json()["records"][0]
+
+    assert record == {"full_name": "Ada Lovelace"}
+
+
+def test_search_with_no_match_is_empty_records_not_404(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com")
+
+    response = search(auth_client, search_query("Grace Hopper"))
+
+    assert response.status_code == 200
+    assert response.json() == {"records": []}
+
+
+def test_search_hides_inactive_and_ambiguous_customers(auth_client, db_session):
+    add(db_session, "Ina", "Gone", "ina@example.com", active=False)
+    add(db_session, "Sam", "Lee", "sam1@example.com")
+    add(db_session, "Sam", "Lee", "sam2@example.com")
+
+    assert search(auth_client, search_query("Ina Gone")).json() == {"records": []}
+    assert search(auth_client, search_query("Sam Lee")).json() == {"records": []}
+
+
+def test_search_agrees_with_verify(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com")
+    add(db_session, "Ina", "Gone", "ina@example.com", active=False)
+
+    for name in ("Ada Lovelace", "Ina Gone", "Nobody Here"):
+        found = bool(search(auth_client, search_query(name)).json()["records"])
+        assert found == verify(auth_client, name).json()["verified"], name
+
+
+def test_search_page_two_is_empty(auth_client, db_session):
+    add(db_session, "Ada", "Lovelace", "ada@example.com")
+    assert search(auth_client, pagination={"limit": 5, "skip": 1}).json() == {"records": []}
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        search_query(operator="CONTAINS"),
+        search_query(operator="STARTS_WITH"),
+        search_query(operator="LIKE"),
+        search_query(field="email"),
+        {"from": "customer"},  # no filter at all would mean "list everyone"
+        {"from": "customer", "queryFilter": {}},
+        {"from": "customer", "queryFilter": {"operation": {"operator": "AND"}}},
+    ],
+)
+def test_search_refuses_anything_but_full_name_equals(auth_client, db_session, query):
+    add(db_session, "Ada", "Lovelace", "ada@example.com")
+
+    response = search(auth_client, query)
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "BAD_REQUEST"
+
+
+def test_search_refuses_a_filter_that_swaps_field_and_value(auth_client):
+    query = search_query()
+    op = query["queryFilter"]["operation"]
+    op["leftOperand"]["isLiteral"] = True
+    assert search(auth_client, query).status_code == 400
+
+
+def test_search_unknown_type_is_404(auth_client):
+    assert search(auth_client, search_query(**{"from": "invoice"})).status_code == 404
+
+
+def test_search_malformed_body_is_400_not_422(auth_client):
+    response = auth_client.post(f"{BASE}/search-records", json={"pagination": {}})
+    assert response.status_code == 400
+    assert response.json()["code"] == "BAD_REQUEST"
