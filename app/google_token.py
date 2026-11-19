@@ -68,14 +68,24 @@ def verify_api_token(access_token: str) -> ApiCaller:
 
     info = _fetch_tokeninfo(access_token)
 
+    # These messages end up in the server log (never in the HTTP response), so they
+    # say which check failed. Client IDs and the caller's own email are not secrets.
     if info.get("aud") != settings.google_client_id:
-        raise InvalidGoogleToken("token was issued to a different client")
+        raise InvalidGoogleToken(
+            f"token audience {info.get('aud')!r} is not this service's GOOGLE_CLIENT_ID"
+        )
 
     email = str(info.get("email") or "").strip().lower()
-    if not email or str(info.get("email_verified")).lower() != "true":
-        raise InvalidGoogleToken("token carries no verified email")
+    if not email:
+        raise InvalidGoogleToken(
+            "token carries no email (was the 'email' scope granted?)"
+        )
+    if str(info.get("email_verified")).lower() != "true":
+        raise InvalidGoogleToken(f"email {email!r} is not verified by Google")
 
     if not _is_allowed(email):
-        raise InvalidGoogleToken("account is not on the allowed list")
+        raise InvalidGoogleToken(
+            f"{email!r} is not on API_ALLOWED_EMAILS / API_ALLOWED_EMAIL_DOMAINS"
+        )
 
     return ApiCaller(email=email)

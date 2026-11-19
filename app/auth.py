@@ -1,3 +1,5 @@
+import logging
+
 from authlib.integrations.starlette_client import OAuth
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -14,6 +16,8 @@ from app.google_token import (
     verify_api_token,
 )
 from app.models import User
+
+logger = logging.getLogger(__name__)
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -141,23 +145,38 @@ def get_api_caller(
     token is a 401 even if a valid session cookie rides along. No Authorization
     header at all falls through to the normal session check.
     """
-    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    raw = request.headers.get("authorization", "")
+    scheme, _, token = raw.partition(" ")
     if scheme.lower() != "bearer":
-        return get_current_user(request, db)
+        try:
+            return get_current_user(request, db)
+        except HTTPException:
+            # Log which scheme arrived (never its value) so a caller sending a
+            # different header than expected is visible in the server log.
+            logger.warning(
+                "API request to %s rejected: no Bearer token and no session "
+                "(Authorization header: %s)",
+                request.url.path,
+                f"scheme {scheme!r}" if raw else "absent",
+            )
+            raise
 
     challenge = {"WWW-Authenticate": "Bearer"}
     token = token.strip()
     if not token:
+        logger.warning("API request to %s rejected: empty Bearer token", request.url.path)
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "Invalid bearer token", headers=challenge
         )
     try:
         return verify_api_token(token)
-    except InvalidGoogleToken:
+    except InvalidGoogleToken as exc:
+        logger.warning("API request to %s rejected: %s", request.url.path, exc)
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "Invalid bearer token", headers=challenge
         ) from None
-    except GoogleTokenCheckUnavailable:
+    except GoogleTokenCheckUnavailable as exc:
+        logger.warning("API request to %s: token check unavailable: %s", request.url.path, exc)
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE, "Token verification unavailable"
         ) from None

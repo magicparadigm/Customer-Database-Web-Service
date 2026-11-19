@@ -175,3 +175,51 @@ def test_tokeninfo_network_error_means_unavailable(monkeypatch):
 
 def test_verify_returns_the_callers_email(bearer_configured, tokeninfo):
     assert verify_api_token("t").email == "dana@example.com"
+
+
+# --- the server log says why a request was refused (and never logs the token) ------
+
+
+def test_audience_mismatch_is_logged_with_both_sides(client, bearer_configured, tokeninfo, caplog):
+    tokeninfo.result = good_info(aud="other-client.apps.googleusercontent.com")
+    with caplog.at_level("WARNING", logger="app.auth"):
+        client.get("/api/customers", headers=BEARER)
+    assert "other-client.apps.googleusercontent.com" in caplog.text
+    assert "GOOGLE_CLIENT_ID" in caplog.text
+
+
+def test_allowlist_rejection_names_the_email(client, bearer_configured, tokeninfo, caplog):
+    tokeninfo.result = good_info(email="mallory@gmail.com")
+    with caplog.at_level("WARNING", logger="app.auth"):
+        client.get("/api/customers", headers=BEARER)
+    assert "mallory@gmail.com" in caplog.text
+    assert "API_ALLOWED_EMAILS" in caplog.text
+
+
+def test_missing_email_scope_is_logged(client, bearer_configured, tokeninfo, caplog):
+    info = good_info()
+    del info["email"], info["email_verified"]
+    tokeninfo.result = info
+    with caplog.at_level("WARNING", logger="app.auth"):
+        client.get("/api/customers", headers=BEARER)
+    assert "no email" in caplog.text
+
+
+def test_the_token_itself_is_never_logged(client, bearer_configured, tokeninfo, caplog):
+    tokeninfo.result = good_info(aud="other")
+    with caplog.at_level("DEBUG"):
+        client.get("/api/customers", headers={"Authorization": "Bearer ya29.super-secret-token"})
+    assert "super-secret-token" not in caplog.text
+
+
+def test_absent_authorization_header_is_logged(client, caplog):
+    with caplog.at_level("WARNING", logger="app.auth"):
+        client.get("/api/customers")
+    assert "Authorization header: absent" in caplog.text
+
+
+def test_other_authorization_scheme_is_logged_without_its_value(client, caplog):
+    with caplog.at_level("WARNING", logger="app.auth"):
+        client.get("/api/customers", headers={"Authorization": "Basic c2VjcmV0OnBhc3N3b3Jk"})
+    assert "scheme 'Basic'" in caplog.text
+    assert "c2VjcmV0" not in caplog.text
