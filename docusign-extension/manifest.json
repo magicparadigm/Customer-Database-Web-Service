@@ -1,17 +1,17 @@
 {
-  "name": "Customer Name Verification",
+  "name": "Customer Name Verification V2",
   "distribution": "PRIVATE",
   "description": {
     "short": "Verifies a signer's full name against the customer database.",
     "long": "Adds a Customer Full Name field to envelopes. When the signer fills it in, the name is checked against the customer database: an exact, case-insensitive match against an active customer passes."
   },
   "publicationRegions": ["US"],
-  "termsOfServiceUrl": "REPLACE_WITH_TERMS_URL",
-  "privacyUrl": "REPLACE_WITH_PRIVACY_URL",
-  "supportUrl": "REPLACE_WITH_SUPPORT_URL",
+  "termsOfServiceUrl": "https://web-production-9ea79.up.railway.app/terms-of-service",
+  "privacyUrl": "https://web-production-9ea79.up.railway.app/privacy-policy",
+  "supportUrl": "https://web-production-9ea79.up.railway.app/support",
   "publisher": {
-    "name": "REPLACE_WITH_PUBLISHER_NAME",
-    "email": "REPLACE_WITH_PUBLISHER_EMAIL"
+    "name": "Magicparadigm Software",
+    "email": "magicparadigm@live.com"
   },
   "connections": [
     {
@@ -20,8 +20,8 @@
       "type": "oauth2",
       "params": {
         "provider": "CUSTOM",
-        "clientId": "REPLACE_WITH_GOOGLE_CLIENT_ID",
-        "clientSecret": "REPLACE_WITH_GOOGLE_CLIENT_SECRET",
+        "clientId": "772414378538-uk62bgp11jngjo15le8kkns4rqorvq8r.apps.googleusercontent.com",
+        "clientSecret": "",
         "scopes": ["openid", "email"],
         "grantType": "authorization_code",
         "customConfig": {
@@ -60,28 +60,28 @@
       "description": "Lists the data types that can be verified",
       "template": "DataIO.Version6.GetTypeNames",
       "connectionsReference": "google",
-      "params": { "uri": "https://REPLACE_WITH_APP_HOST/api/connected-fields/type-names" }
+      "params": { "uri": "https://web-production-9ea79.up.railway.app/api/connected-fields/type-names" }
     },
     {
       "name": "get-type-definitions",
       "description": "Returns the fields of each verifiable type",
       "template": "DataIO.Version6.GetTypeDefinitions",
       "connectionsReference": "google",
-      "params": { "uri": "https://REPLACE_WITH_APP_HOST/api/connected-fields/type-definitions" }
+      "params": { "uri": "https://web-production-9ea79.up.railway.app/api/connected-fields/type-definitions" }
     },
     {
       "name": "search-records",
       "description": "Finds a customer whose full name matches exactly",
       "template": "DataIO.Version6.SearchRecords",
       "connectionsReference": "google",
-      "params": { "uri": "https://REPLACE_WITH_APP_HOST/api/connected-fields/search-records" }
+      "params": { "uri": "https://web-production-9ea79.up.railway.app/api/connected-fields/search-records" }
     },
     {
       "name": "verify",
       "description": "Checks a full name against the customer database",
       "template": "ConnectedFields.Version1.Verify",
       "connectionsReference": "google",
-      "params": { "uri": "https://REPLACE_WITH_APP_HOST/api/connected-fields/verify" }
+      "params": { "uri": "https://web-production-9ea79.up.railway.app/api/connected-fields/verify" }
     }
   ]
 }
